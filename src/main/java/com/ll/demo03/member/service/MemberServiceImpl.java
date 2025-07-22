@@ -8,6 +8,7 @@ import com.ll.demo03.member.controller.port.MemberService;
 import com.ll.demo03.member.domain.Member;
 import com.ll.demo03.member.service.port.MemberRepository;
 import com.ll.demo03.notification.service.port.NotificationRepository;
+import com.ll.demo03.videoTask.service.port.VideoTaskRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -21,7 +22,7 @@ public class MemberServiceImpl implements MemberService {
     private final MemberRepository memberRepository;
     private final UGCRepository ugcRepository;
     private final ImageTaskRepository imageTaskRepository;
-    private final com.ll.demo03.videoTask.service.port.VideoTaskRepository videoTaskRepository;
+    private final VideoTaskRepository videoTaskRepository;
     private final NotificationRepository notificationRepository;
 
     @Scheduled(cron = "0 0 0 * * *")

@@ -6,6 +6,7 @@ import com.ll.demo03.global.error.ErrorCode;
 import com.ll.demo03.global.exception.CustomException;
 import com.ll.demo03.global.infrastructure.MessageProducerImpl;
 import com.ll.demo03.global.port.CursorPaginationService;
+import com.ll.demo03.global.port.MessageProducer;
 import com.ll.demo03.global.port.RedisService;
 import com.ll.demo03.imageTask.controller.port.ImageTaskService;
 import com.ll.demo03.imageTask.controller.request.ImageQueueRequest;
@@ -21,6 +22,7 @@ import com.ll.demo03.member.domain.Member;
 import com.ll.demo03.member.service.port.MemberRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
+import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,15 +32,15 @@ import java.util.List;
 
 @Service
 @Slf4j
+@Builder
 @Transactional
-@RequiredArgsConstructor
 public class ImageTaskServiceImpl implements ImageTaskService {
 
-    private final ImageTaskRepository imageTaskRepository;
+    private final ImageTaskRepository taskRepository;
     private final MemberRepository memberRepository;
     private final RedisService redisService;
     private final Network network;
-    private final MessageProducerImpl imageMessageProducer;
+    private final MessageProducer messageProducer;
     private final CursorPaginationService paginationService;
     private final ImageTaskPaginationStrategy paginationStrategy;
     private final ImageTaskResponseConverter responseConverter;
@@ -46,14 +48,15 @@ public class ImageTaskServiceImpl implements ImageTaskService {
     @Value("${custom.webhook-url}")
     private String webhookUrl;
 
+
     @Override
     public void initate(ImageTaskRequest request, Member member){
         Member creator = memberRepository.findById(member.getId()).orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND_USER)); //이렇게 영속화 시켜야함
         creator.decreaseCredit(1); //@AuthenticationPrincipal PrincipalDetails 에서 꺼낸 member 객체는 JPA에 영속되어있지 않으므로 decreaseCredit해도 JPA가 트랜잭션 커밋 시점에 알아서 update 쿼리를 날리지 않는다 .
 
         ImageTaskRequest newRequest = ImageTask.updatePrompt(request, network);
-        ImageQueueRequest imageQueueRequest = ImageTask.toImageQueueRequest(newRequest, member);
-        imageMessageProducer.sendImageCreationMessage(imageQueueRequest);
+        ImageQueueRequest queueRequest = ImageTask.toImageQueueRequest(newRequest, member);
+        messageProducer.sendImageCreationMessage(queueRequest);
         memberRepository.save(creator);
     }
 
@@ -64,7 +67,7 @@ public class ImageTaskServiceImpl implements ImageTaskService {
 
         ImageTask task = ImageTask.from(member, message);
         task = task.updateStatus(Status.IN_PROGRESS, null);
-        ImageTask saved = imageTaskRepository.save(task);
+        ImageTask saved = taskRepository.save(task);
         Long taskId = saved.getId();
 
         redisService.pushToQueue("image", taskId);
